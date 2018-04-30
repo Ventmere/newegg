@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "newegg",
+  "newegg_cli"
+]
+[patch.crates-io]
+newegg = { path = "./newegg" }
