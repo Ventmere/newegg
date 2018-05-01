@@ -1,3 +1,4 @@
+use order::{CancelOrderResponse, ShipOrderResponse};
 use reqwest::StatusCode;
 
 error_chain! {
@@ -9,6 +10,14 @@ error_chain! {
     Deserialize(msg: String, body: String) {
       description("deserialize body error")
       display("deserialize body error: {}, body = '{}'", msg, body)
+    }
+    CancelOrderNotSuccess(res: CancelOrderResponse) {
+      description("cancel order not success")
+      display("cancel order not success: {:?}", res)
+    }
+    ShipOrderNotSuccess(res: ShipOrderResponse) {
+      description("ship order not success")
+      display("ship order not success: {:?}", res)
     }
   }
 
