@@ -1,6 +1,6 @@
 use reqwest::{Client, Response, StatusCode};
 pub use reqwest::{Method, RequestBuilder};
-use result::{ErrorKind, NeweggResult};
+use result::{NeweggError, NeweggResult};
 use serde::Deserialize;
 use serde_json;
 
@@ -84,8 +84,10 @@ impl NeweggClient {
   }
 
   pub fn request(&self, method: Method, path: &str) -> RequestBuilder {
-    use reqwest::{header::{qitem, Accept, Authorization, Headers},
-                  mime};
+    use reqwest::{
+      header::{qitem, Accept, Authorization, Headers},
+      mime,
+    };
     let mut b = self
       .http
       .request(method, &format!("{}{}", self.marketplace_.base_url(), path));
@@ -123,14 +125,21 @@ impl NeweggResponse for Response {
     };
 
     if self.status() != StatusCode::Ok {
-      return Err(
-        ErrorKind::Request(self.url().to_string(), self.status(), body_str.to_string()).into(),
-      );
+      return Err(NeweggError::Request {
+        path: self.url().to_string(),
+        status: self.status(),
+        body: body_str.to_string(),
+      });
     }
 
     match serde_json::from_str(body_str) {
       Ok(v) => Ok(v),
-      Err(err) => return Err(ErrorKind::Deserialize(err.to_string(), body_str.to_string()).into()),
+      Err(err) => {
+        return Err(NeweggError::Deserialize {
+          msg: err.to_string(),
+          body: body_str.to_string(),
+        })
+      }
     }
   }
 }

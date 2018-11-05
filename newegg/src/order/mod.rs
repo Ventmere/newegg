@@ -1,5 +1,5 @@
 use client::*;
-use result::{ErrorKind, NeweggResult};
+use result::{NeweggError, NeweggResult};
 
 mod types;
 
@@ -45,7 +45,7 @@ impl OrderApi for NeweggClient {
     if res.is_success() {
       Ok(res)
     } else {
-      Err(ErrorKind::CancelOrderNotSuccess(res).into())
+      Err(NeweggError::CancelOrderNotSuccess(res).into())
     }
   }
 
@@ -65,7 +65,7 @@ impl OrderApi for NeweggClient {
     if res.is_success() {
       Ok(res)
     } else {
-      Err(ErrorKind::ShipOrderNotSuccess(res).into())
+      Err(NeweggError::ShipOrderNotSuccess(res).into())
     }
   }
 }
