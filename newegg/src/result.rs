@@ -29,6 +29,19 @@ pub enum NeweggError {
   Json(::serde_json::Error),
 }
 
+impl NeweggError {
+  pub fn should_try_again(&self) -> bool {
+    match *self {
+      NeweggError::Request { status, .. } => {
+        let code = status.as_u16();
+        // 429 Too Many Requests
+        code == 429 || code == 500 || code == 503
+      }
+      _ => false,
+    }
+  }
+}
+
 pub type NeweggResult<T> = ::std::result::Result<T, NeweggError>;
 
 macro_rules! impl_from {
