@@ -531,6 +531,28 @@ impl ToString for ShipCarrier {
   }
 }
 
+impl<T> From<T> for ShipCarrier
+where
+  T: AsRef<str>,
+{
+  fn from(v: T) -> Self {
+    let normalized = v
+      .as_ref()
+      .to_lowercase()
+      .split_whitespace()
+      .collect::<Vec<&str>>()
+      .join(" ");
+    match normalized.as_ref() {
+      "ups" => ShipCarrier::Ups,
+      "ups mi" => ShipCarrier::UpsMi,
+      "fedex" => ShipCarrier::FedEx,
+      "dhl" => ShipCarrier::Dhl,
+      "usps" => ShipCarrier::Usps,
+      _ => ShipCarrier::Other(v.as_ref().trim().to_string()),
+    }
+  }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Package {
   #[serde(rename = "TrackingNumber")]
