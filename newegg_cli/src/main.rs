@@ -22,7 +22,7 @@ macro_rules! dispatch {
 
   (ITEM $matches:expr, ($cmd:ident => $($sub:tt)+)) => {
     if let Some(matches) = $matches.subcommand_matches(stringify!($cmd)) {
-      dispatch!(matches => $($sub)*); 
+      dispatch!(matches => $($sub)*);
     }
   };
 }
@@ -51,7 +51,8 @@ fn main() {
         (@arg FILE: +required "JSON file contains an order array.")
       )
     )
-  ).get_matches();
+  )
+  .get_matches();
 
   let env = matches.value_of("ENV").unwrap_or(".env");
 

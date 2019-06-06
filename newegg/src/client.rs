@@ -8,6 +8,7 @@ use serde_json;
 pub enum NeweggMarketplace {
   Usa,
   Canada,
+  Australia,
 }
 
 impl NeweggMarketplace {
@@ -15,6 +16,7 @@ impl NeweggMarketplace {
     match *self {
       NeweggMarketplace::Usa => "https://api.newegg.com/marketplace",
       NeweggMarketplace::Canada => "https://api.newegg.com/marketplace/can",
+      NeweggMarketplace::Australia => "https://api.newegg.com/marketplace",
     }
   }
 
@@ -26,6 +28,7 @@ impl NeweggMarketplace {
     match *self {
       NeweggMarketplace::Usa => "USA",
       NeweggMarketplace::Canada => "CAN",
+      NeweggMarketplace::Australia => "AUS",
     }
   }
 }
