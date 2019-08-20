@@ -1,10 +1,33 @@
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct NeweggApiResponse<B> {
-  pub is_success: bool,
+  is_success: String,
   pub operation_type: String,
-  pub seller_id: String,
+  #[serde(rename = "sellerID")]
+  pub seller_id: Option<String>,
   pub response_body: B,
+  pub memo: Option<String>,
+}
+
+impl<B> NeweggApiResponse<B> {
+  pub fn get_is_success(&self) -> bool {
+    self.is_success == "true"
+  }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct NeweggApiResponseWrapped<B> {
+  #[serde(rename = "NeweggAPIResponse")]
+  pub newegg_api_response: NeweggApiResponse<B>,
+}
+
+impl<B> std::ops::Deref for NeweggApiResponseWrapped<B> {
+  type Target = NeweggApiResponse<B>;
+
+  fn deref(&self) -> &Self::Target {
+    &self.newegg_api_response
+  }
 }
