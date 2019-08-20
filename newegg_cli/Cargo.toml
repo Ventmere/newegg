@@ -2,11 +2,13 @@
 name = "newegg_cli"
 version = "0.1.0"
 authors = ["fluxxu <fluxxu@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 clap = "2.31.2"
 dotenv = "0.10.1"
-newegg = "0.2.0"
+newegg = "0.3.0"
 serde_json = "1.0"
 serde = "1.0"
 chrono = { version = "0.4.0", features = ["serde"] }
+futures-preview = { version = "=0.3.0-alpha.18", features = ["compat"] }

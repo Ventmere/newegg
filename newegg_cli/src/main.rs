@@ -1,10 +1,6 @@
-extern crate chrono;
-extern crate dotenv;
-extern crate newegg;
-extern crate serde;
-extern crate serde_json;
-#[macro_use]
-extern crate clap;
+#![feature(async_await)]
+use clap::clap_app;
+use futures::executor::block_on;
 
 mod helpers;
 
@@ -68,7 +64,7 @@ fn main() {
           let domain = ServiceStatusDomain::from_str(&domain_str).ok_or_else(|| {
             format!("Unknown domain: '{}'", domain_str)
           }).unwrap();
-          let res = client.get_service_status(domain).unwrap();
+          let res = block_on(client.get_service_status(domain)).unwrap();
           helpers::dump_json(res)
         })
       )
@@ -94,7 +90,7 @@ fn main() {
             helpers::dump_json(&action);
             print!("\n");
             println!("Response:");
-            let res = client.ship_order(order_id, &action).unwrap();
+            let res = block_on(client.ship_order(order_id, &action)).unwrap();
             helpers::dump_json(res);
           })
         )
@@ -122,7 +118,7 @@ fn main() {
                 .page_size(30)
                 .finalize();
 
-              let res = client.get_order_info(&req).unwrap();
+              let res = block_on(client.get_order_info(&req)).unwrap();
 
               println!("total = {}, page_total = {}", res.total(), res.len());
 

@@ -1,5 +1,9 @@
-use order::{CancelOrderResponse, ShipOrderResponse};
+use failure_derive::Fail;
 use reqwest::StatusCode;
+use std::future::Future;
+use std::pin::Pin;
+
+use crate::order::{CancelOrderResponse, ShipOrderResponse};
 
 #[derive(Fail, Debug)]
 pub enum NeweggError {
@@ -27,6 +31,9 @@ pub enum NeweggError {
 
   #[fail(display = "json error: {}", _0)]
   Json(::serde_json::Error),
+
+  #[fail(display = "invalid header: {}", _0)]
+  InvalidHeader(&'static str),
 }
 
 impl NeweggError {
@@ -56,3 +63,5 @@ macro_rules! impl_from {
 
 impl_from!(Http(::reqwest::Error));
 impl_from!(Json(::serde_json::Error));
+
+pub type NeweggFuture<T> = Pin<Box<dyn Future<Output = NeweggResult<T>>>>;
