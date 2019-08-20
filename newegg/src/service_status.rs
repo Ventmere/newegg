@@ -89,6 +89,6 @@ impl ServiceStatusApi for NeweggClient {
     async move {
       send.compat().await?
         .get_response().await
-    }.boxed_local()
+    }.boxed()
   }
 }

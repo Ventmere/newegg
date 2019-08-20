@@ -61,6 +61,7 @@ impl<'de> Deserialize<'de> for NeweggDateTime {
 }
 
 /// https://serde.rs/enum-number.html
+#[macro_export]
 macro_rules! enum_number {
   ($name:ident { $($variant:ident = $value:expr, )* }) => {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]

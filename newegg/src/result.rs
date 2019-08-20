@@ -64,4 +64,4 @@ macro_rules! impl_from {
 impl_from!(Http(::reqwest::Error));
 impl_from!(Json(::serde_json::Error));
 
-pub type NeweggFuture<T> = Pin<Box<dyn Future<Output = NeweggResult<T>>>>;
+pub type NeweggFuture<T> = Pin<Box<dyn Future<Output = NeweggResult<T>> + Send>>;

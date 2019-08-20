@@ -1,8 +1,10 @@
 #![feature(async_await)]
 use clap::clap_app;
-use futures::executor::block_on;
+use newegg::NeweggPlatform;
+use serde_json::json;
 
 mod helpers;
+use helpers::block_on_unwrap;
 
 macro_rules! dispatch {
   ($matches:expr => $head:tt $($rest:tt)*) => {
@@ -47,6 +49,11 @@ fn main() {
         (@arg FILE: +required "JSON file contains an order array.")
       )
     )
+    (@subcommand report =>
+      (@subcommand submit =>
+        (@arg REPORT_TYPE: -t --type +required +takes_value "Report Type.")
+      )
+    )
   )
   .get_matches();
 
@@ -64,7 +71,7 @@ fn main() {
           let domain = ServiceStatusDomain::from_str(&domain_str).ok_or_else(|| {
             format!("Unknown domain: '{}'", domain_str)
           }).unwrap();
-          let res = block_on(client.get_service_status(domain)).unwrap();
+          let res = block_on_unwrap(client.get_service_status(domain));
           helpers::dump_json(res)
         })
       )
@@ -90,7 +97,7 @@ fn main() {
             helpers::dump_json(&action);
             print!("\n");
             println!("Response:");
-            let res = block_on(client.ship_order(order_id, &action)).unwrap();
+            let res = block_on_unwrap(client.ship_order(order_id, &action));
             helpers::dump_json(res);
           })
         )
@@ -118,7 +125,7 @@ fn main() {
                 .page_size(30)
                 .finalize();
 
-              let res = block_on(client.get_order_info(&req)).unwrap();
+              let res = block_on_unwrap(client.get_order_info(&req));
 
               println!("total = {}, page_total = {}", res.total(), res.len());
 
@@ -187,6 +194,52 @@ fn main() {
             println!("OK.");
 
             fs::remove_file("last_order.json").unwrap();
+          })
+        )
+      )
+
+      (report =>
+        (submit =>
+          (|m| {
+            use newegg::report::*;
+            let client = helpers::get_client();
+            let report_type: &str = m.value_of("REPORT_TYPE").unwrap();
+
+            let (operation_type, body) = match report_type {
+              "inventory" => {
+                match client.get_platform() {
+                  NeweggPlatform::Newegg => (
+                    "InternationalInventoryReportRequest",
+                    json!({
+                      "DailyInventoryReportCriteria": {
+                        "FulfillType": "0",
+                        "RequestType": "INTERNATIONAL_INVENTORY_REPORT",
+                        "FileType": "CSV"
+                      }
+                    })
+                  ),
+                  _ => (
+                    "DailyInventoryReportRequest",
+                    json!({
+                      "DailyInventoryReportCriteria": {
+                        "FulfillType": "0",
+                        "RequestType": "DAILY_INVENTORY_REPORT",
+                        "FileType": "CSV"
+                      }
+                    })
+                  )
+                }
+              },
+              other => panic!("unknown report type: '{}'", other)
+            };
+
+            println!("Request:");
+            let req = ReportRequest::new(operation_type, body);
+            helpers::dump_json(&req);
+            print!("\n");
+            let res = block_on_unwrap(client.submit_report_request(&req));
+            println!("Response:");
+            helpers::dump_json(res);
           })
         )
       )

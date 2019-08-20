@@ -1,5 +1,5 @@
 use crate::result::{NeweggError, NeweggResult, NeweggFuture};
-use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::header::{HeaderValue};
 pub use reqwest::r#async::RequestBuilder;
 use reqwest::r#async::{Client, Response};
 pub use reqwest::Method;
@@ -10,30 +10,18 @@ use futures::compat::*;
 use futures::FutureExt;
 
 #[derive(Debug, Clone, Copy)]
-pub enum NeweggMarketplace {
-  Usa,
-  Canada,
-  Australia,
+pub enum NeweggPlatform {
+  Newegg,
+  NeweggBusiness,
+  NeweggCanada,
 }
 
-impl NeweggMarketplace {
+impl NeweggPlatform {
   pub fn base_url(&self) -> &str {
     match *self {
-      NeweggMarketplace::Usa => "https://api.newegg.com/marketplace",
-      NeweggMarketplace::Canada => "https://api.newegg.com/marketplace/can",
-      NeweggMarketplace::Australia => "https://api.newegg.com/marketplace",
-    }
-  }
-
-  /// The country for your orders. Only the ISO standard 3-digit codes are accepted.
-  /// To review the complete list of available values, please download the following:
-  ///
-  /// https://promotions.newegg.com/Marketplace/Sellers/resourceLibrary/International%20Country%20Guide.pdf
-  pub fn country_code(&self) -> &str {
-    match *self {
-      NeweggMarketplace::Usa => "USA",
-      NeweggMarketplace::Canada => "CAN",
-      NeweggMarketplace::Australia => "AUS",
+      NeweggPlatform::Newegg => "https://api.newegg.com/marketplace",
+      NeweggPlatform::NeweggBusiness => "https://api.newegg.com/marketplace/b2b",
+      NeweggPlatform::NeweggCanada => "https://api.newegg.com/marketplace/can",
     }
   }
 }
@@ -43,12 +31,12 @@ pub struct NeweggClient {
   seller_id_: String,
   token: HeaderValue,
   secret_key: HeaderValue,
-  marketplace_: NeweggMarketplace,
+  platform: NeweggPlatform,
 }
 
 impl NeweggClient {
   pub fn new(
-    marketplace: NeweggMarketplace,
+    platform: NeweggPlatform,
     seller_id: &str,
     token: &str,
     secret_key: &str,
@@ -56,13 +44,13 @@ impl NeweggClient {
     let client = Client::builder()
       .timeout(::std::time::Duration::from_secs(300))
       .build()?;
-    Self::with_http_client(marketplace, seller_id, token, secret_key, client)
+    Self::with_http_client(platform, seller_id, token, secret_key, client)
   }
 
   /// Please make sure your HTTP client has very long timeout
   /// because some APIs are very slow
   pub fn with_http_client(
-    marketplace: NeweggMarketplace,
+    platform: NeweggPlatform,
     seller_id: &str,
     token: &str,
     secret_key: &str,
@@ -74,7 +62,7 @@ impl NeweggClient {
         .map_err(|_| NeweggError::InvalidHeader("Authorization"))?,
       secret_key: HeaderValue::from_str(secret_key)
         .map_err(|_| NeweggError::InvalidHeader("SecretKey"))?,
-      marketplace_: marketplace,
+      platform,
       http,
     })
   }
@@ -83,23 +71,24 @@ impl NeweggClient {
     self.seller_id_.as_ref()
   }
 
-  pub fn marketplace(&self) -> NeweggMarketplace {
-    self.marketplace_
+  pub fn get_platform(&self) -> NeweggPlatform {
+    self.platform
   }
 
   pub fn request(&self, method: Method, path: &str) -> RequestBuilder {
-    use reqwest::header::{HeaderMap, ACCEPT, AUTHORIZATION};
+    use reqwest::header::{HeaderMap, ACCEPT, AUTHORIZATION, CONTENT_TYPE};
     let mut b = self
       .http
-      .request(method, &format!("{}{}", self.marketplace_.base_url(), path));
+      .request(method, &format!("{}{}", self.platform.base_url(), path));
 
     b = b.query(&[("sellerid", &self.seller_id_ as &str)]);
 
     let mut headers = HeaderMap::new();
     headers.insert(AUTHORIZATION, self.token.clone());
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     headers.insert(
-      HeaderName::from_static("SecretKey"),
+      "SecretKey",
       self.secret_key.clone(),
     );
     b.headers(headers)
@@ -151,6 +140,6 @@ impl NeweggResponse for Response {
           }
         }
       }
-    }.boxed_local()
+    }.boxed()
   }
 }
