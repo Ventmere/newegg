@@ -2,12 +2,12 @@ use serde::Serialize;
 use serde_derive::Deserialize;
 
 use crate::helpers::NeweggDateTime;
-use crate::types::NeweggApiResponse;
+use crate::types::{NeweggApiResponse, NeweggApiResponseWrapped};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ReportRequest<B> {
-  pub operation_type: &'static str,
+  pub operation_type: String,
   pub request_body: B,
 }
 
@@ -15,9 +15,9 @@ impl<B> ReportRequest<B>
 where
   B: Serialize,
 {
-  pub fn new(operation_type: &'static str, body: B) -> Self {
+  pub fn new(operation_type: &str, body: B) -> Self {
     ReportRequest {
-      operation_type,
+      operation_type: operation_type.to_string(),
       request_body: body,
     }
   }
@@ -33,12 +33,9 @@ impl GetReportStatusRequest {
   pub fn new(ids: &[&str], max_count: u64) -> Self {
     GetReportStatusRequest {
       get_request_status: GetRequestStatus {
-        request_id_list: ids
-          .iter()
-          .map(|id| RequestIDList {
-            request_id: id.to_string(),
-          })
-          .collect(),
+        request_id_list: RequestIDList {
+          request_id: ids.iter().map(|id| id.to_string()).collect(),
+        },
         max_count: max_count.to_string(),
       },
     }
@@ -48,14 +45,16 @@ impl GetReportStatusRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct GetRequestStatus {
-  request_id_list: Vec<RequestIDList>,
+  #[serde(rename = "RequestIDList")]
+  request_id_list: RequestIDList,
   max_count: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct RequestIDList {
-  request_id: String,
+  #[serde(rename = "RequestID")]
+  request_id: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,6 +69,7 @@ pub enum RequestStatus {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct GetReportResultRequest {
+  #[serde(rename = "RequestID")]
   pub request_id: String,
   pub page_info: PageInfo,
 }
@@ -96,6 +96,7 @@ pub struct PageInfo {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ResponseInfo {
+  #[serde(rename = "RequestID")]
   pub request_id: String,
   pub request_type: String,
   pub request_date: NeweggDateTime,
@@ -112,4 +113,4 @@ pub struct ResponseBody {
 }
 
 pub type ReportResponse = NeweggApiResponse<ResponseBody>;
-pub type ReportResultReponse = NeweggApiResponse<ResponseInfo>;
+pub type ReportResultReponse = NeweggApiResponseWrapped<ResponseInfo>;

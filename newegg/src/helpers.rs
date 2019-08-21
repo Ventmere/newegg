@@ -1,8 +1,13 @@
 use chrono::{DateTime, TimeZone, Utc};
 use chrono_tz::{Tz, US::Pacific};
+use futures_cpupool::CpuPool;
+use lazy_static::lazy_static;
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use serde::ser::{Serialize, Serializer};
 use std::fmt;
+use std::future::Future;
+
+use crate::result::NeweggResult;
 
 /// Newegg Marketplace API requires the datetime field to be in Pacific Standard Time
 /// in all request and response content. Please ensure in all your files and requests,
@@ -119,4 +124,18 @@ macro_rules! enum_number {
       }
     }
   }
+}
+
+lazy_static! {
+  static ref THREAD_POOL: CpuPool = { CpuPool::new_num_cpus() };
+}
+
+pub fn block<F, R>(f: F) -> impl Future<Output = NeweggResult<R>>
+where
+  F: FnOnce() -> NeweggResult<R> + Send + 'static,
+  R: Send + 'static,
+{
+  use futures::compat::*;
+
+  THREAD_POOL.spawn_fn(f).compat()
 }

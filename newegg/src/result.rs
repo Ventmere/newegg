@@ -34,6 +34,18 @@ pub enum NeweggError {
 
   #[fail(display = "invalid header: {}", _0)]
   InvalidHeader(&'static str),
+
+  #[fail(display = "parse url error: {}", _0)]
+  Url(url::ParseError),
+
+  #[fail(display = "ftp error: {}", _0)]
+  Ftp(ftp::types::FtpError),
+
+  #[fail(display = "ftp url error: {}", _0)]
+  FtpUrl(String),
+
+  #[fail(display = "id error: {}", _0)]
+  Io(std::io::Error),
 }
 
 impl NeweggError {
@@ -63,5 +75,8 @@ macro_rules! impl_from {
 
 impl_from!(Http(::reqwest::Error));
 impl_from!(Json(::serde_json::Error));
+impl_from!(Url(url::ParseError));
+impl_from!(Ftp(ftp::types::FtpError));
+impl_from!(Io(std::io::Error));
 
 pub type NeweggFuture<T> = Pin<Box<dyn Future<Output = NeweggResult<T>> + Send>>;

@@ -53,6 +53,16 @@ fn main() {
       (@subcommand submit =>
         (@arg REPORT_TYPE: -t --type +required +takes_value "Report Type.")
       )
+      (@subcommand get_status =>
+        (@arg ID: -i --id +required +multiple +takes_value "Report Request ID.")
+      )
+      (@subcommand get_result =>
+        (@arg OPERATION_TYPE: -t --type +required +takes_value "Operation Type.")
+        (@arg ID: -i --id +required +takes_value "Report Request ID.")
+      )
+      (@subcommand get_report_file =>
+        (@arg URL: -u --url +required +takes_value "URL.")
+      )
     )
   )
   .get_matches();
@@ -240,6 +250,39 @@ fn main() {
             let res = block_on_unwrap(client.submit_report_request(&req));
             println!("Response:");
             helpers::dump_json(res);
+          })
+        )
+        (get_status =>
+          (|m| {
+            use newegg::report::*;
+            let client = helpers::get_client();
+            let ids: Vec<&str> = m.values_of("ID").unwrap().collect();
+
+            let res = block_on_unwrap(client.get_report_status(&ids, None));
+            println!("Response:");
+            helpers::dump_json(res);
+          })
+        )
+        (get_result =>
+          (|m| {
+            use newegg::report::*;
+            let client = helpers::get_client();
+            let op_type: &str = m.value_of("OPERATION_TYPE").unwrap();
+            let id: &str = m.value_of("ID").unwrap();
+
+            let res = block_on_unwrap(client.get_report_result(op_type, id, 1, None));
+            println!("Response:");
+            helpers::dump_json(res);
+          })
+        )
+        (get_report_file =>
+          (|m| {
+            use newegg::report::*;
+            use std::io::Write;
+            let client = helpers::get_client();
+            let url: &str = m.value_of("URL").unwrap();
+            let data = block_on_unwrap(client.get_report_file(url));
+            std::io::stdout().write_all(&data).unwrap();
           })
         )
       )

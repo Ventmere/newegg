@@ -1,13 +1,13 @@
-use crate::result::{NeweggError, NeweggResult, NeweggFuture};
-use reqwest::header::{HeaderValue};
+use crate::result::{NeweggError, NeweggFuture, NeweggResult};
+use futures::compat::*;
+use futures::FutureExt;
+use reqwest::header::HeaderValue;
 pub use reqwest::r#async::RequestBuilder;
 use reqwest::r#async::{Client, Response};
 pub use reqwest::Method;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json;
-use futures::compat::*;
-use futures::FutureExt;
 
 #[derive(Debug, Clone, Copy)]
 pub enum NeweggPlatform {
@@ -87,28 +87,21 @@ impl NeweggClient {
     headers.insert(AUTHORIZATION, self.token.clone());
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-    headers.insert(
-      "SecretKey",
-      self.secret_key.clone(),
-    );
+    headers.insert("SecretKey", self.secret_key.clone());
     b.headers(headers)
   }
 }
 
 pub trait NeweggResponse {
-  fn get_response<T: for<'de> Deserialize<'de>>(
-    &mut self,
-  ) -> NeweggFuture<T>;
+  fn get_response<T: for<'de> Deserialize<'de>>(&mut self) -> NeweggFuture<T>;
 }
 
 const BOM: char = '\u{feff}';
 
 impl NeweggResponse for Response {
-  fn get_response<T: for<'de> Deserialize<'de>>(
-    &mut self,
-  ) -> NeweggFuture<T> {
+  fn get_response<T: for<'de> Deserialize<'de>>(&mut self) -> NeweggFuture<T> {
     let status = self.status().clone();
-    let url  = self.url().to_string();
+    let url = self.url().to_string();
     let text = self.text();
     async move {
       let body = text.compat().await?;
@@ -132,14 +125,13 @@ impl NeweggResponse for Response {
       } else {
         match serde_json::from_str(body_str) {
           Ok(v) => Ok(v),
-          Err(err) => {
-            Err(NeweggError::Deserialize {
-              msg: err.to_string(),
-              body: body_str.to_string(),
-            })
-          }
+          Err(err) => Err(NeweggError::Deserialize {
+            msg: err.to_string(),
+            body: body_str.to_string(),
+          }),
         }
       }
-    }.boxed()
+    }
+      .boxed()
   }
 }
