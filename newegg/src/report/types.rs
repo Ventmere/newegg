@@ -96,7 +96,7 @@ pub struct PageInfo {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ResponseInfo {
-  #[serde(rename = "RequestID")]
+  #[serde(rename(deserialize = "RequestID", deserialize = "RequestId"))]
   pub request_id: String,
   pub request_type: String,
   pub request_date: NeweggDateTime,

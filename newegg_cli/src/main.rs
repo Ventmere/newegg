@@ -240,6 +240,15 @@ fn main() {
                   )
                 }
               },
+              "price" => (
+                "InternationalPriceReportRequest",
+                json!({
+                  "DailyPriceReportCriteria": {
+                    "RequestType": "INTERNATIONAL_PRICE_REPORT",
+                    "FileType": "CSV"
+                  }
+                })
+              ),
               other => panic!("unknown report type: '{}'", other)
             };
 
