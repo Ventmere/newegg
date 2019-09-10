@@ -57,7 +57,7 @@ pub struct RequestIDList {
   request_id: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RequestStatus {
   Submitted,
