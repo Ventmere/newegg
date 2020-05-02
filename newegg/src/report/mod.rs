@@ -4,8 +4,8 @@ use serde::Serialize;
 use url::Url;
 
 use crate::client::*;
-use crate::result::{NeweggError, NeweggFuture};
 use crate::helpers::block;
+use crate::result::{NeweggError, NeweggFuture};
 
 mod types;
 
@@ -80,11 +80,23 @@ impl ReportApi for NeweggClient {
     let url = url.to_owned();
     block(move || {
       let url = Url::parse(&url)?;
-      let host = url.host_str().ok_or_else(|| NeweggError::FtpUrl(format!("no host")))?;
-      let port = url.port_or_known_default().ok_or_else(|| NeweggError::FtpUrl(format!("no port")))?;
+      let host = url
+        .host_str()
+        .ok_or_else(|| NeweggError::FtpUrl(format!("no host")))?;
+      let port = url
+        .port_or_known_default()
+        .ok_or_else(|| NeweggError::FtpUrl(format!("no port")))?;
       let mut stream = FtpStream::connect(&format!("{}:{}", host, port))?;
-      stream.login(url.username(), url.password().ok_or_else(|| NeweggError::FtpUrl(format!("no password")))?)?;
-      let path_segments: Vec<_> = url.path_segments().ok_or_else(|| NeweggError::FtpUrl(format!("no path")))?.collect();
+      stream.login(
+        url.username(),
+        url
+          .password()
+          .ok_or_else(|| NeweggError::FtpUrl(format!("no password")))?,
+      )?;
+      let path_segments: Vec<_> = url
+        .path_segments()
+        .ok_or_else(|| NeweggError::FtpUrl(format!("no path")))?
+        .collect();
       let mut r = if path_segments.len() > 1 {
         let path: String = path_segments[..(path_segments.len() - 1)].join("");
         stream.cwd(&path)?;
@@ -95,6 +107,7 @@ impl ReportApi for NeweggClient {
       let mut data = vec![];
       r.read_to_end(&mut data)?;
       Ok(data)
-    }).boxed()
+    })
+    .boxed()
   }
 }

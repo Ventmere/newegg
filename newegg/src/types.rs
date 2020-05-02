@@ -41,3 +41,10 @@ impl<B> std::ops::Deref for NeweggApiResponseWrapped<B> {
     &self.newegg_api_response
   }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MaybeList<T> {
+  Single(T),
+  List(Vec<T>),
+}

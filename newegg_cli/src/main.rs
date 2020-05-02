@@ -1,10 +1,10 @@
-#![feature(async_await)]
 use clap::clap_app;
 use newegg::NeweggPlatform;
 use serde_json::json;
 
 mod helpers;
 use helpers::block_on_unwrap;
+mod report;
 
 macro_rules! dispatch {
   ($matches:expr => $head:tt $($rest:tt)*) => {
@@ -35,6 +35,9 @@ fn main() {
       (about: "Manage orders")
       (@subcommand list_orders =>
       )
+      (@subcommand get =>
+        (@arg ORDER_ID: -o --order +required +takes_value "Order ID.")
+      )
       (@subcommand ship =>
         (@arg ORDER_ID: -o --order +required +takes_value "Order ID.")
         (@arg SKU: -i --sku +required +takes_value "Item SKU.")
@@ -63,6 +66,22 @@ fn main() {
       (@subcommand get_report_file =>
         (@arg URL: -u --url +required +takes_value "URL.")
       )
+      (@subcommand test_parse_us =>
+        (@arg FILE: +required "CSV file to parse.")
+      )
+      (@subcommand test_parse_ca =>
+        (@arg FILE: +required "CSV file to parse.")
+      )
+    )
+    (@subcommand feed =>
+      (@subcommand get_status =>
+        (@arg ID: -i --id +required +multiple +takes_value "Feed Request ID.")
+      )
+      (@subcommand get_result =>
+        (@arg ID: -i --id +required +takes_value "Feed Request ID.")
+      )
+      (@subcommand test_inventory_update => )
+      (@subcommand test_inventory_and_price_update => )
     )
   )
   .get_matches();
@@ -87,6 +106,22 @@ fn main() {
       )
 
       (order =>
+        (get =>
+          (|m| {
+            use newegg::order::*;
+            let client = helpers::get_client();
+            let order_id: i64 = m.value_of("ORDER_ID").unwrap().parse().unwrap();
+            let order = client.get_order_info(
+              &GetOrderInfoRequest::new()
+                .page_index(1)
+                .order_number_list(vec![order_id.to_string()])
+                .finalize()
+            );
+            let res = block_on_unwrap(order);
+            helpers::dump_json(res);
+          })
+        )
+
         (ship =>
           (|m| {
             use newegg::order::*;
@@ -292,6 +327,151 @@ fn main() {
             let url: &str = m.value_of("URL").unwrap();
             let data = block_on_unwrap(client.get_report_file(url));
             std::io::stdout().write_all(&data).unwrap();
+          })
+        )
+        (test_parse_us =>
+          (|m| {
+            use std::iter::FromIterator;
+            let path = m.value_of("FILE").unwrap();
+
+            println!("Loading csv file: {}", path);
+
+            let file = std::fs::File::open(path).unwrap();
+            let rows = Result::<Vec<report::InventoryReportRow>, csv::Error>::from_iter(
+              csv::Reader::from_reader(file).into_deserialize(),
+            ).unwrap();
+
+            println!("{:#?}", rows);
+          })
+        )
+        (test_parse_ca =>
+          (|m| {
+            use std::iter::FromIterator;
+            let path = m.value_of("FILE").unwrap();
+
+            println!("Loading csv file: {}", path);
+
+            let file = std::fs::File::open(path).unwrap();
+            let rows = Result::<Vec<report::CanInventoryReportRow>, csv::Error>::from_iter(
+              csv::Reader::from_reader(file).into_deserialize(),
+            ).unwrap();
+
+            println!("{:#?}", rows);
+          })
+        )
+      )
+
+      (feed =>
+        (get_status =>
+          (|m| {
+            use newegg::feed::*;
+            let client = helpers::get_client();
+            let ids: Vec<&str> = m.values_of("ID").unwrap().collect();
+
+            let req = GetRequestStatus {
+              request_id_list: RequestIdList {
+                request_id: ids.into_iter().map(ToString::to_string).collect()
+              },
+              ..Default::default()
+            };
+
+            println!("Request:");
+            helpers::dump_json(&req);
+
+            let res = block_on_unwrap(client.get_feed_status(&req));
+            println!("\nResponse:");
+            helpers::dump_json(res);
+          })
+        )
+        (get_result =>
+          (|m| {
+            use newegg::feed::*;
+            let client = helpers::get_client();
+            let id: &str = m.value_of("ID").unwrap();
+
+            let res = block_on_unwrap(client.get_feed_result::<serde_json::Value>(id));
+            println!("Response:");
+            helpers::dump_json(res);
+          })
+        )
+        (test_inventory_update =>
+          (|_| {
+            use newegg::feed::*;
+            use newegg::feed::message::*;
+            let client = helpers::get_client();
+
+            let msg = InventoryUpdateFeedMessage {
+              inventory: InventoryUpdateFeedInventory {
+                item: vec![
+                  InventoryUpdateFeedItem {
+                    seller_part_number: "edifier-r1280t-fba".to_string(),
+                    inventory: "1".to_string(),
+                    warehouse_location: "USA".to_string(),
+                    ..Default::default()
+                  },
+                  InventoryUpdateFeedItem {
+                    seller_part_number: "edifier-r1280db-wood".to_string(),
+                    inventory: "2".to_string(),
+                    warehouse_location: "USA".to_string(),
+                    ..Default::default()
+                  }
+                ],
+              }
+            };
+
+            let req = RequestEnvelope::new(
+              "BatchInventoryUpdate.xsd",
+              &[("DocumentVersion", "2.0")],
+              "Inventory",
+              msg
+            );
+
+            println!("Request:");
+            helpers::dump_json(&req);
+            let res = block_on_unwrap(client.submit_feed("INVENTORY_DATA", &req));
+            println!("\nResponse:");
+            helpers::dump_json(res);
+          })
+        )
+        (test_inventory_and_price_update =>
+          (|_| {
+            use newegg::feed::*;
+            use newegg::feed::message::*;
+            let client = helpers::get_client();
+
+            let msg = InventoryAndPriceFeedMessage {
+              inventory: InventoryAndPriceFeedInventory {
+                item: vec![
+                  InventoryAndPriceFeedFeedItem {
+                    seller_part_number: "edifier-r1280t-fba".to_string(),
+                    inventory: "1".to_string(),
+                    shipping: "default".to_string(),
+                    activation_mark: Some("True".to_string()),
+                    ..Default::default()
+                  },
+                  InventoryAndPriceFeedFeedItem {
+                    seller_part_number: "edifier-r1280db-wood".to_string(),
+                    inventory: "2".to_string(),
+                    shipping: "default".to_string(),
+                    activation_mark: Some("True".to_string()),
+                    ..Default::default()
+                  }
+                ],
+              }
+            };
+
+            let req = RequestEnvelope::new(
+              "Inventory.xsd",
+              &[("DocumentVersion", "1.0")],
+              "Inventory",
+              msg
+            ).inventory_and_price_data_overwrite(true);
+
+            println!("Request:");
+            helpers::dump_json(&req);
+            let res = block_on_unwrap(client.submit_feed("INVENTORY_AND_PRICE_DATA", &req));
+            println!("\nResponse:");
+            helpers::dump_json(res);
           })
         )
       )

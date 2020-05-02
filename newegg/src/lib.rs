@@ -1,5 +1,3 @@
-#![feature(async_await)]
-
 #[macro_use]
 mod helpers;
 mod types;
