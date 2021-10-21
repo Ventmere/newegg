@@ -1,9 +1,8 @@
-use futures::compat::*;
-use futures::FutureExt;
 use serde_derive::{Deserialize, Serialize};
+use async_trait::async_trait;
 
 use crate::client::*;
-use crate::result::NeweggFuture;
+use crate::result::NeweggResult;
 
 pub enum ServiceStatusDomain {
   Content,
@@ -71,21 +70,25 @@ pub struct ResponseBody {
   timestamp: String,
 }
 
+#[async_trait]
 pub trait ServiceStatusApi {
-  fn get_service_status(
+  async fn get_service_status(
     &self,
     domain: ServiceStatusDomain,
-  ) -> NeweggFuture<GetServiceStatusResponse>;
+  ) -> NeweggResult<GetServiceStatusResponse>;
 }
 
+#[async_trait]
 impl ServiceStatusApi for NeweggClient {
-  fn get_service_status(
+  async fn get_service_status(
     &self,
     domain: ServiceStatusDomain,
-  ) -> NeweggFuture<GetServiceStatusResponse> {
-    let send = self
+  ) -> NeweggResult<GetServiceStatusResponse> {
+    self
       .request(Method::GET, &format!("/{}/servicestatus", domain.as_str()))
-      .send();
-    async move { send.compat().await?.get_response().await }.boxed()
+      .send()
+      .await?
+      .get_response()
+      .await
   }
 }

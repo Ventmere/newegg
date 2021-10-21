@@ -1,80 +1,87 @@
-use futures::compat::*;
-use futures::FutureExt;
 use serde::Serialize;
 use url::Url;
 
 use crate::client::*;
 use crate::helpers::block;
-use crate::result::{NeweggError, NeweggFuture};
+use crate::result::{NeweggError, NeweggResult};
+use async_trait::async_trait;
 
 mod types;
 
 pub use self::types::*;
 
+#[async_trait]
 pub trait ReportApi {
-  fn submit_report_request<R>(&self, request: &ReportRequest<R>) -> NeweggFuture<ReportResponse>
+  async fn submit_report_request<R>(&self, request: ReportRequest<R>) -> NeweggResult<ReportResponse>
   where
-    R: Serialize;
-  fn get_report_status(
+    R: Serialize + Send + Sync;
+  async fn get_report_status(
     &self,
     request_ids: &[&str],
     max_count: Option<u64>,
-  ) -> NeweggFuture<ReportResponse>;
-  fn get_report_result(
+  ) -> NeweggResult<ReportResponse>;
+  async fn get_report_result(
     &self,
     operation_type: &str,
     request_id: &str,
     page_index: u64,
     page_size: Option<u64>,
-  ) -> NeweggFuture<ReportResultReponse>;
-  fn get_report_file(&self, url: &str) -> NeweggFuture<Vec<u8>>;
+  ) -> NeweggResult<ReportResultReponse>;
+  async fn get_report_file(&self, url: &str) -> NeweggResult<Vec<u8>>;
 }
 
+#[async_trait]
 impl ReportApi for NeweggClient {
-  fn submit_report_request<R>(&self, request: &ReportRequest<R>) -> NeweggFuture<ReportResponse>
+  async fn submit_report_request<R>(&self, request: ReportRequest<R>) -> NeweggResult<ReportResponse>
   where
-    R: Serialize,
+    R: Serialize + Send + Sync,
   {
-    let send = self
+    self
       .request(Method::POST, "/reportmgmt/report/submitrequest")
-      .json(request)
-      .send();
-    async move { send.compat().await?.get_response().await }.boxed()
+      .json(&request)
+      .send()
+      .await?
+      .get_response()
+      .await
   }
 
-  fn get_report_status(
+  async fn get_report_status(
     &self,
     request_ids: &[&str],
     max_count: Option<u64>,
-  ) -> NeweggFuture<ReportResponse> {
-    let send = self
+  ) -> NeweggResult<ReportResponse> {
+    self
       .request(Method::PUT, "/reportmgmt/report/status")
       .json(&ReportRequest::new(
         "GetReportStatusRequest",
         GetReportStatusRequest::new(request_ids, max_count.unwrap_or(100)),
       ))
-      .send();
-    async move { send.compat().await?.get_response().await }.boxed()
+      .send()
+      .await?
+      .get_response()
+      .await
   }
 
-  fn get_report_result(
+  async fn get_report_result(
     &self,
     operation_type: &str,
     request_id: &str,
     page_index: u64,
     page_size: Option<u64>,
-  ) -> NeweggFuture<ReportResultReponse> {
-    let send = self
+  ) -> NeweggResult<ReportResultReponse> {
+    self
       .request(Method::PUT, "/reportmgmt/report/result")
       .json(&ReportRequest::new(
         operation_type,
         GetReportResultRequest::new(request_id, page_index, page_size.unwrap_or(100)),
       ))
-      .send();
-    async move { send.compat().await?.get_response().await }.boxed()
+      .send()
+      .await?
+      .get_response()
+      .await
   }
 
-  fn get_report_file(&self, url: &str) -> NeweggFuture<Vec<u8>> {
+  async fn get_report_file(&self, url: &str) -> NeweggResult<Vec<u8>> {
     use ftp::FtpStream;
     use std::io::Read;
     let url = url.to_owned();
@@ -107,7 +114,6 @@ impl ReportApi for NeweggClient {
       let mut data = vec![];
       r.read_to_end(&mut data)?;
       Ok(data)
-    })
-    .boxed()
+    }).await
   }
 }

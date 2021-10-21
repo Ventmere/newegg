@@ -1,49 +1,52 @@
-use futures::compat::*;
-use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use async_trait::async_trait;
+use crate::result::NeweggResult;
 
 use crate::client::*;
-use crate::result::NeweggFuture;
 
 mod types;
 pub use self::types::*;
 
 pub mod message;
 
+#[async_trait]
 pub trait FeedApi {
-  fn submit_feed<T>(
+  async fn submit_feed<T>(
     &self,
     request_type: &str,
-    request: &RequestEnvelope<T>,
-  ) -> NeweggFuture<FeedResponse>
+    request: RequestEnvelope<T>,
+  ) -> NeweggResult<FeedResponse>
   where
-    T: Serialize;
-  fn get_feed_status(&self, request: &GetRequestStatus) -> NeweggFuture<FeedResponse>;
-  fn get_feed_result<T>(&self, request_id: &str) -> NeweggFuture<ResponseEnvelope<T>>
+    T: Serialize + Send;
+  async fn get_feed_status(&self, request: &GetRequestStatus) -> NeweggResult<FeedResponse>;
+  async fn get_feed_result<T>(&self, request_id: &str) -> NeweggResult<ResponseEnvelope<T>>
   where
-    T: for<'de> Deserialize<'de>;
+    T: for<'de> Deserialize<'de> + Send;
 }
 
+#[async_trait]
 impl FeedApi for NeweggClient {
-  fn submit_feed<T>(
+  async fn submit_feed<T>(
     &self,
     request_type: &str,
-    request: &RequestEnvelope<T>,
-  ) -> NeweggFuture<FeedResponse>
+    request: RequestEnvelope<T>,
+  ) -> NeweggResult<FeedResponse>
   where
-    T: Serialize,
+    T: Serialize + Send,
   {
-    let send = self
+    self
       .request(Method::POST, "/datafeedmgmt/feeds/submitfeed")
-      .query(&[("requesttype", request_type)])
+      .query(&[("requesttype", request_type.to_owned())])
       .json(&json!({ "NeweggEnvelope": request }))
-      .send();
-    async move { send.compat().await?.get_response().await }.boxed()
+      .send()
+      .await?
+      .get_response()
+      .await
   }
 
-  fn get_feed_status(&self, request: &GetRequestStatus) -> NeweggFuture<FeedResponse> {
-    let send = self
+  async fn get_feed_status(&self, request: &GetRequestStatus) -> NeweggResult<FeedResponse> {
+    self
       .request(Method::PUT, "/datafeedmgmt/feeds/status")
       .json(&json!({
         "OperationType": "GetFeedStatusRequest",
@@ -51,19 +54,24 @@ impl FeedApi for NeweggClient {
           "GetRequestStatus": request
         }
       }))
-      .send();
-    async move { send.compat().await?.get_response().await }.boxed()
+      .send()
+      .await?
+      .get_response()
+      .await
   }
-  fn get_feed_result<T>(&self, request_id: &str) -> NeweggFuture<ResponseEnvelope<T>>
+
+  async fn get_feed_result<T>(&self, request_id: &str) -> NeweggResult<ResponseEnvelope<T>>
   where
-    T: for<'de> Deserialize<'de>,
+    T: for<'de> Deserialize<'de> + Send,
   {
-    let send = self
+    self
       .request(
         Method::GET,
         &format!("/datafeedmgmt/feeds/result/{}", request_id),
       )
-      .send();
-    async move { send.compat().await?.get_response().await }.boxed()
+      .send()
+      .await?
+      .get_response()
+      .await
   }
 }

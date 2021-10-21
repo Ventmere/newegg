@@ -1,13 +1,12 @@
-use crate::result::{NeweggError, NeweggFuture, NeweggResult};
-use futures::compat::*;
-use futures::FutureExt;
+use crate::result::{NeweggError, NeweggResult};
 use reqwest::header::HeaderValue;
-pub use reqwest::r#async::RequestBuilder;
-use reqwest::r#async::{Client, Response};
+pub use reqwest::RequestBuilder;
+use reqwest::{Client, Response};
 pub use reqwest::Method;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json;
+use async_trait::async_trait;
 
 #[derive(Debug, Clone, Copy)]
 pub enum NeweggPlatform {
@@ -92,46 +91,44 @@ impl NeweggClient {
   }
 }
 
+#[async_trait]
 pub trait NeweggResponse {
-  fn get_response<T: for<'de> Deserialize<'de>>(&mut self) -> NeweggFuture<T>;
+  async fn get_response<T: for<'de> Deserialize<'de>>(self) -> NeweggResult<T>;
 }
 
 const BOM: char = '\u{feff}';
 
+#[async_trait]
 impl NeweggResponse for Response {
-  fn get_response<T: for<'de> Deserialize<'de>>(&mut self) -> NeweggFuture<T> {
+  async  fn get_response<T: for<'de> Deserialize<'de>>(self) -> NeweggResult<T> {
     let status = self.status().clone();
     let url = self.url().to_string();
-    let text = self.text();
-    async move {
-      let body = text.compat().await?;
-      let body_str: &str = if let Some(c) = body.chars().next() {
-        // strip BOM
-        if c == BOM {
-          &body[BOM.len_utf8()..]
-        } else {
-          body.as_ref()
-        }
+    let text = self.text().await?;
+    let body_str: &str = if let Some(c) = text.chars().next() {
+      // strip BOM
+      if c == BOM {
+        &text[BOM.len_utf8()..]
       } else {
-        ""
-      };
+        text.as_ref()
+      }
+    } else {
+      ""
+    };
 
-      if status != StatusCode::OK {
-        Err(NeweggError::Request {
-          path: url,
-          status,
+    if status != StatusCode::OK {
+      Err(NeweggError::Request {
+        path: url,
+        status,
+        body: body_str.to_string(),
+      })
+    } else {
+      match serde_json::from_str(body_str) {
+        Ok(v) => Ok(v),
+        Err(err) => Err(NeweggError::Deserialize {
+          msg: err.to_string(),
           body: body_str.to_string(),
-        })
-      } else {
-        match serde_json::from_str(body_str) {
-          Ok(v) => Ok(v),
-          Err(err) => Err(NeweggError::Deserialize {
-            msg: err.to_string(),
-            body: body_str.to_string(),
-          }),
-        }
+        }),
       }
     }
-      .boxed()
   }
 }

@@ -1,15 +1,12 @@
-use failure_derive::Fail;
+use thiserror::Error;
 use reqwest::StatusCode;
-use std::future::Future;
-use std::pin::Pin;
 
 use crate::order::{CancelOrderResponse, ShipOrderResponse};
 
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum NeweggError {
-  #[fail(
-    display = "request error: path = '{}', status = '{}', body = '{}'",
-    path, status, body
+  #[error(
+    "request error: path = '{path}', status = '{status}', body = '{body}'"
   )]
   Request {
     path: String,
@@ -17,35 +14,38 @@ pub enum NeweggError {
     body: String,
   },
 
-  #[fail(display = "deserialize body error: msg = '{}', body = '{}'", msg, body)]
+  #[error("deserialize body error: msg = '{msg}', body = '{body}'")]
   Deserialize { msg: String, body: String },
 
-  #[fail(display = "cancel order not success: {:?}", _0)]
+  #[error("cancel order not success: {0:?}")]
   CancelOrderNotSuccess(CancelOrderResponse),
 
-  #[fail(display = "ship order not success: {:?}", _0)]
+  #[error("ship order not success: {0:?}")]
   ShipOrderNotSuccess(ShipOrderResponse),
 
-  #[fail(display = "http error: {}", _0)]
-  Http(::reqwest::Error),
+  #[error("http error: {0}")]
+  Http(#[from] reqwest::Error),
 
-  #[fail(display = "json error: {}", _0)]
-  Json(::serde_json::Error),
+  #[error("json error: {0}")]
+  Json(#[from] serde_json::Error),
 
-  #[fail(display = "invalid header: {}", _0)]
+  #[error("invalid header: {0}")]
   InvalidHeader(&'static str),
 
-  #[fail(display = "parse url error: {}", _0)]
-  Url(url::ParseError),
+  #[error("parse url error: {0}")]
+  Url(#[from] url::ParseError),
 
-  #[fail(display = "ftp error: {}", _0)]
-  Ftp(ftp::types::FtpError),
+  #[error("ftp error: {0}")]
+  Ftp(#[from] ftp::types::FtpError),
 
-  #[fail(display = "ftp url error: {}", _0)]
+  #[error("ftp url error: {0}")]
   FtpUrl(String),
 
-  #[fail(display = "id error: {}", _0)]
-  Io(std::io::Error),
+  #[error("id error: {0}")]
+  Io(#[from] std::io::Error),
+
+  #[error("runtime: {0}")]
+  Runtime(#[from] tokio::task::JoinError),
 }
 
 impl NeweggError {
@@ -62,21 +62,3 @@ impl NeweggError {
 }
 
 pub type NeweggResult<T> = ::std::result::Result<T, NeweggError>;
-
-macro_rules! impl_from {
-  ($v:ident($t:ty)) => {
-    impl From<$t> for NeweggError {
-      fn from(e: $t) -> Self {
-        NeweggError::$v(e)
-      }
-    }
-  };
-}
-
-impl_from!(Http(::reqwest::Error));
-impl_from!(Json(::serde_json::Error));
-impl_from!(Url(url::ParseError));
-impl_from!(Ftp(ftp::types::FtpError));
-impl_from!(Io(std::io::Error));
-
-pub type NeweggFuture<T> = Pin<Box<dyn Future<Output = NeweggResult<T>> + Send>>;

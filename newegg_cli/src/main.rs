@@ -1,9 +1,9 @@
+
 use clap::clap_app;
 use newegg::NeweggPlatform;
 use serde_json::json;
 
 mod helpers;
-use helpers::block_on_unwrap;
 mod report;
 
 macro_rules! dispatch {
@@ -14,8 +14,11 @@ macro_rules! dispatch {
 
   ($matches:expr => ) => {};
 
-  (ITEM $matches:expr, ($handler:expr)) => {
-    ($handler as fn(&clap::ArgMatches))(&$matches)
+  (ITEM $matches:expr, (
+    |$arg:tt| $b:block
+  )) => {
+    let $arg = &$matches;
+    $b
   };
 
   (ITEM $matches:expr, ($cmd:ident => $($sub:tt)+)) => {
@@ -25,7 +28,14 @@ macro_rules! dispatch {
   };
 }
 
-fn main() {
+macro_rules! await_unwrap {
+  ($e:expr) => {
+    $e.await.unwrap()
+  }
+}
+
+#[tokio::main]
+async fn main() {
   let matches = clap_app!(myapp =>
     (@arg ENV: -e --env +takes_value ".env file path.")
     (@subcommand get_service_status =>
@@ -100,7 +110,7 @@ fn main() {
           let domain = ServiceStatusDomain::from_str(&domain_str).ok_or_else(|| {
             format!("Unknown domain: '{}'", domain_str)
           }).unwrap();
-          let res = block_on_unwrap(client.get_service_status(domain));
+          let res = await_unwrap!(client.get_service_status(domain));
           helpers::dump_json(res)
         })
       )
@@ -111,13 +121,12 @@ fn main() {
             use newegg::order::*;
             let client = helpers::get_client();
             let order_id: i64 = m.value_of("ORDER_ID").unwrap().parse().unwrap();
-            let order = client.get_order_info(
+            let res = await_unwrap!(client.get_order_info(
               &GetOrderInfoRequest::new()
                 .page_index(1)
                 .order_number_list(vec![order_id.to_string()])
                 .finalize()
-            );
-            let res = block_on_unwrap(order);
+            ));
             helpers::dump_json(res);
           })
         )
@@ -142,7 +151,7 @@ fn main() {
             helpers::dump_json(&action);
             print!("\n");
             println!("Response:");
-            let res = block_on_unwrap(client.ship_order(order_id, &action));
+            let res = await_unwrap!(client.ship_order(order_id, &action));
             helpers::dump_json(res);
           })
         )
@@ -170,7 +179,7 @@ fn main() {
                 .page_size(30)
                 .finalize();
 
-              let res = block_on_unwrap(client.get_order_info(&req));
+              let res = await_unwrap!(client.get_order_info(&req));
 
               println!("total = {}, page_total = {}", res.total(), res.len());
 
@@ -291,7 +300,7 @@ fn main() {
             let req = ReportRequest::new(operation_type, body);
             helpers::dump_json(&req);
             print!("\n");
-            let res = block_on_unwrap(client.submit_report_request(&req));
+            let res = await_unwrap!(client.submit_report_request(req));
             println!("Response:");
             helpers::dump_json(res);
           })
@@ -302,7 +311,7 @@ fn main() {
             let client = helpers::get_client();
             let ids: Vec<&str> = m.values_of("ID").unwrap().collect();
 
-            let res = block_on_unwrap(client.get_report_status(&ids, None));
+            let res = await_unwrap!(client.get_report_status(&ids, None));
             println!("Response:");
             helpers::dump_json(res);
           })
@@ -314,7 +323,7 @@ fn main() {
             let op_type: &str = m.value_of("OPERATION_TYPE").unwrap();
             let id: &str = m.value_of("ID").unwrap();
 
-            let res = block_on_unwrap(client.get_report_result(op_type, id, 1, None));
+            let res = await_unwrap!(client.get_report_result(op_type, id, 1, None));
             println!("Response:");
             helpers::dump_json(res);
           })
@@ -325,7 +334,7 @@ fn main() {
             use std::io::Write;
             let client = helpers::get_client();
             let url: &str = m.value_of("URL").unwrap();
-            let data = block_on_unwrap(client.get_report_file(url));
+            let data = await_unwrap!(client.get_report_file(url));
             std::io::stdout().write_all(&data).unwrap();
           })
         )
@@ -378,7 +387,7 @@ fn main() {
             println!("Request:");
             helpers::dump_json(&req);
 
-            let res = block_on_unwrap(client.get_feed_status(&req));
+            let res = await_unwrap!(client.get_feed_status(&req));
             println!("\nResponse:");
             helpers::dump_json(res);
           })
@@ -389,7 +398,7 @@ fn main() {
             let client = helpers::get_client();
             let id: &str = m.value_of("ID").unwrap();
 
-            let res = block_on_unwrap(client.get_feed_result::<serde_json::Value>(id));
+            let res = await_unwrap!(client.get_feed_result::<serde_json::Value>(id));
             println!("Response:");
             helpers::dump_json(res);
           })
@@ -428,7 +437,7 @@ fn main() {
 
             println!("Request:");
             helpers::dump_json(&req);
-            let res = block_on_unwrap(client.submit_feed("INVENTORY_DATA", &req));
+            let res = await_unwrap!(client.submit_feed("INVENTORY_DATA", req));
             println!("\nResponse:");
             helpers::dump_json(res);
           })
@@ -469,7 +478,7 @@ fn main() {
 
             println!("Request:");
             helpers::dump_json(&req);
-            let res = block_on_unwrap(client.submit_feed("INVENTORY_AND_PRICE_DATA", &req));
+            let res = await_unwrap!(client.submit_feed("INVENTORY_AND_PRICE_DATA", req));
             println!("\nResponse:");
             helpers::dump_json(res);
           })
